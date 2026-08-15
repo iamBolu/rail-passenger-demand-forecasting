@@ -57,6 +57,37 @@ To inspect the saved results without re-running anything:
 python -c "import pandas as pd; print(pd.read_csv('models/model_comparison.csv'))"
 ```
 
+## Making a forecast
+
+`src/forecast.py` loads the trained model and produces a prediction for a given
+date, rebuilding the nine features from historical boardings.
+
+```bash
+python src/forecast.py                          # next day after the history ends
+python src/forecast.py --date 2017-10-01        # a specific date
+python src/forecast.py --date 2018-03-05 --days 7
+```
+
+```text
+$ python src/forecast.py --date 2018-03-05 --days 7
+History: 2001-01-01 to 2021-11-30 (7,639 days)
+
+2018-03-05  Monday     predicted    685,278   actual    686,228   off by      950 (0.1%)
+2018-03-06  Tuesday    predicted    709,448   actual    723,274   off by   13,826 (1.9%)
+2018-03-07  Wednesday  predicted    717,910   actual    731,992   off by   14,082 (1.9%)
+2018-03-08  Thursday   predicted    726,540   actual    734,447   off by    7,907 (1.1%)
+2018-03-09  Friday     predicted    734,099   actual    712,092   off by   22,007 (3.1%)
+2018-03-10  Saturday   predicted    437,868   actual    394,014   off by   43,854 (11.1%)
+2018-03-11  Sunday     predicted    319,041   actual    286,948   off by   32,093 (11.2%)
+```
+
+Only the first day is built purely from actual history. Because a forecast for
+day D needs actual boardings up to D-1, each subsequent day is built on earlier
+predictions and error compounds — 0.1% on day one, roughly 11% by day seven.
+This is the same mechanism that causes the ARIMA baseline to decay to a flat
+line over a long horizon, and it is why the model is only trustworthy one day
+ahead unless fresh actuals are supplied.
+
 ## Feature engineering
 
 A date is a unique value, so there is no repeating pattern in it to learn from.
@@ -211,8 +242,14 @@ Sunday 1 October 2017 — predicted **378,277**, actual **361,156**, difference
 4. **The data is daily, not hourly.** The model answers "how busy will next
    Thursday be", not "how busy will 8am be".
 
-5. **Not deployed.** This is an analysis and modelling project — there is no
-   serving layer, live data feed, or scheduled retraining.
+5. **Not deployed.** `src/forecast.py` provides a command-line interface to the
+   trained model, but there is no serving layer, live data feed, or scheduled
+   retraining. This is an analysis and modelling project, not a production
+   system.
+
+6. **Forecasts are only reliable one day ahead.** The lag features require
+   actual boardings up to the previous day. Beyond that the script feeds its own
+   predictions forward and error compounds, as shown above.
 
 ## Project structure
 
@@ -234,6 +271,8 @@ rail-passenger-demand-forecasting/
 │   ├── 01_data_exploration.ipynb
 │   ├── 02_exploratory_data_analysis.ipynb
 │   └── 03_modeling.ipynb
+├── src/
+│   └── forecast.py                          CLI: date → prediction
 ├── README.md
 └── requirements.txt
 ```
